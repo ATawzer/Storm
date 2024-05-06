@@ -7,6 +7,13 @@ name = "pypi"
 pymongo = "*"
 invoke = "*"
 spotipy = "*"
+mongoengine = "*"
+pytest = "*"
+coverage = "*"
+flake8 = "*"
+black = "*"
+pytest-cov = "*"
+mongomock = "*"
 
 [dev-packages]
 
