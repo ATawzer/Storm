@@ -1,4 +1,7 @@
 from invoke import task
+from storm.jobs import ETLPlaylistOperation
+from storm import StormClient, StormDB
+from storm.jobs.base import StormContext
 
 
 @task
@@ -19,3 +22,11 @@ def lint(c):
 def format(c):
     """ Runs black on the project"""
     c.run("black ./storm")
+
+@task
+def run_playlist_etl(c):
+    """ Runs the playlist ETL job"""
+    context = StormContext(StormClient(), StormDB())
+    instrumental_safety = "0R1gw1JbcOFD0r8IzrbtYP"
+    ETLPlaylistOperation([instrumental_safety]).execute(context)
+    

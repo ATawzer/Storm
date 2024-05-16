@@ -1,4 +1,4 @@
-from mongoengine import Document, StringField
+from mongoengine import Document, StringField, ObjectIdField
 
 
 class StormConfig(Document):
@@ -7,6 +7,8 @@ class StormConfig(Document):
 
     Attributes
     ----------
+    storm_name : StringField
+        The name of the storm configuration, is a unique identifier.
     input_playlist : StringField
         The name of the input playlist. This will be used to get a list of
         artists to get tracks for.
@@ -15,7 +17,9 @@ class StormConfig(Document):
         written to.
     """
 
+    storm_name = StringField(required=True)
     input_playlist = StringField(required=True)
     target_playlist = StringField(required=True)
+    _id = ObjectIdField()
 
     meta = {"collection": "storm_config"}
