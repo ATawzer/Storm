@@ -1,8 +1,9 @@
 from pymongo import MongoClient
-from storm.objects import StormConfig, Playlist, Track, PlaylistTrack, Artist
+from storm.objects import StormConfig, Playlist, Track, PlaylistTrack, Artist, Album
 
 from .utils.logging import database_logger
 from mongoengine import connect
+from mongoengine.queryset.visitor import Q
 
 
 class StormDB:
@@ -68,6 +69,81 @@ class StormDB:
         
         Track.objects()
         for track in Track.objects():
-            artist = track["artists"]
-            if not Artist.objects(artist=artist['id']).first():
-                Artist.from_json(artist).save()
+            artists = track["artists"]
+            for artist in artists:
+                artist_id = artist["id"] if "id" in artist else None
+                if artist_id:
+                    if not Artist.objects(_id=artist_id).first():
+                        database_logger.info(f"New artist found in tracks: {artist_id}, {artist['name'] if 'name' in artist else 'No Artist Name'}")
+                        Artist.from_json(artist).save()
+
+        database_logger.info("Updated artists from tracks.")
+
+    def update_albums_from_artist_albums(self, artist, albums):
+        """Updates the artist albums in the database."""
+        for album in albums:
+            if not Album.objects(_id=album["id"]).first():
+                Album.from_json(album).save()
+
+        Artist.objects(_id=artist["_id"]).first().update_album_date()
+
+    def get_artists_for_album_collection(self, start_date, return_missing=True):
+        """Returns all artists for the album collection.
+
+        If an end date is provided, only artists with albums updated between
+        the start and end date will be returned.
+
+        If an artist has no last_album_update, they will be returned if return_missing is True.
+        """
+        query = Q()
+        
+        if start_date:
+            query &= Q(last_album_update__lte=start_date)
+            
+        if return_missing:
+            query |= Q(last_album_update__exists=False)
+        
+        return Artist.objects(query)
+    
+    def get_albums_for_track_collection(self, start_date=None, only_return_missing=True):
+        """Returns all albums for the track collection.
+
+        If an end date is provided, only albums with tracks collected between
+        the start and end date will be returned.
+
+        If an album has no tracks_collected_date, they will be returned if return_missing is True.
+        """
+        query = Q()
+        
+        if start_date:
+            query &= Q(tracks_collected_date__lte=start_date)
+            
+        if only_return_missing:
+            query &= Q(tracks_collected_date__exists=False)
+        
+        return Album.objects(query)
+    
+    def get_tracks_by_release_date(self, start_date, end_date):
+        """Returns all tracks released between the start and end date."""
+        return Track.objects(release_date__gte=start_date, release_date__lt=end_date)
+    
+    def update_tracks_from_album_tracks(self, album_id, tracks):
+        """Updates the album tracks in the database."""
+        for track in tracks:
+            track.update({"album": {"id":album_id}})
+            Track.from_json(track).save()
+
+        Album.objects(_id=album_id).first().update_tracks_collected_date()
+        database_logger.info(f"Updated album tracks: {len(tracks)}")
+
+    def update_album_track_collection_fail(self, album_id):
+        """Updates the album track collection fail count in the database."""
+        album = Album.objects(_id=album_id).first()
+        album.increment_track_collection_fail_count()
+        album.save()
+
+        database_logger.warning(f"Album fail count at: {album.track_collection_fail_count} for album: {album_id}")
+
+
+        
+        

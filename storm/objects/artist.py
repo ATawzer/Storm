@@ -4,7 +4,6 @@ from mongoengine import (
     DictField,
     ListField,
     IntField,
-    BooleanField,
     DateTimeField,
 )
 
