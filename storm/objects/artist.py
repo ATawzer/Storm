@@ -9,6 +9,7 @@ from mongoengine import (
 
 from datetime import datetime
 
+
 class Artist(Document):
     """
     A class used to represent an artist in the database.
@@ -22,7 +23,7 @@ class Artist(Document):
     popularity : IntField
         The popularity of the artist.
     """
-    
+
     name = StringField(required=True)
     external_urls = DictField()
     followers = DictField()
@@ -49,10 +50,27 @@ class Artist(Document):
             popularity=json["popularity"] if "popularity" in json else None,
             images=json["images"] if "images" in json else [],
             type=json["type"] if "type" in json else None,
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
-    
+
     def update_album_date(self):
         """Updates the last album update date."""
         self.last_album_update = datetime.now()
         self.save()
+
+class ArtistBlacklist(Document):
+    """
+    A class used to represent an artist blacklist in the database.
+    These are members that should not be included in the specified storm run.
+
+    Attributes
+    ----------
+    artist_id : StringField
+        The ID of the artist to blacklist.
+    """
+
+    artist_id = StringField(required=True, primary_key=True)
+    storm_name = StringField(required=True)
+    blacklist_type = StringField()
+
+    meta = {"collection": "artist_blacklist"}

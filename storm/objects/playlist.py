@@ -1,7 +1,15 @@
-from mongoengine import Document, StringField, ListField, BooleanField, DictField, DateTimeField
+from mongoengine import (
+    Document,
+    StringField,
+    ListField,
+    BooleanField,
+    DictField,
+    DateTimeField,
+)
 from .track import Track
 
 from datetime import datetime
+
 
 class Playlist(Document):
     """
@@ -42,9 +50,10 @@ class Playlist(Document):
             followers=json["followers"] if "followers" in json else {},
             snapshot_id=json["snapshot_id"] if "snapshot_id" in json else None,
             type=json["type"] if "type" in json else None,
-            last_updated=datetime.now()
+            sys_last_updated=datetime.now(),
         )
-    
+
+
 class PlaylistTrack(Document):
     """
     Class used to represent a playlist item in the database, these are returned
@@ -74,6 +83,7 @@ class PlaylistTrack(Document):
     is_local = BooleanField()
     _id = StringField(required=True, primary_key=True)
     sys_last_updated = DateTimeField()
+    sys_is_deleted = BooleanField(default=False)
 
     meta = {"collection": "playlist_track"}
 
@@ -87,15 +97,25 @@ class PlaylistTrack(Document):
             added_at=json["added_at"],
             added_by=json["added_by"],
             is_local=json["is_local"],
-            last_updated=datetime.now()
+            sys_last_updated=datetime.now(),
         )
-    
+
     def save(self):
         """Saves the playlist item to the database."""
         super().save()
         self.save_track()
-    
+
     def save_track(self):
         """Saves the nested track from the playlist item."""
         track = Track.from_json(self.track)
         track.save()
+
+    def get_artists(self):
+        """Returns a list of artists for the track."""
+        return [x["id"] for x in self.track["artists"]]
+    
+    def soft_delete(self):
+        """Soft deletes the playlist track."""
+        self.sys_last_updated = datetime.now()
+        self.sys_is_deleted = True
+        self.save()

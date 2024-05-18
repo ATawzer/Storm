@@ -29,9 +29,12 @@ class ETLPlaylistOperation(StormOperation):
         etl_logger.info(f"Synchronizing data with database...")
 
         context.storm_db.update_playlist(playlist)
-        context.storm_db.update_playlist_tracks(playlist_id, tracks)
+        context.storm_db.update_playlist_tracks(playlist_id, tracks, flag_deleted=True)
 
-        etl_logger.info(f"Data synchronized with database for playlist: {playlist_id}, {playlist['name']}")
+        etl_logger.info(
+            f"Data synchronized with database for playlist: {playlist_id}, {playlist['name']}"
+        )
+
 
 class ETLArtistAlbums(StormOperation):
     """
@@ -48,16 +51,25 @@ class ETLArtistAlbums(StormOperation):
         Execute the operation.
         """
 
-        etl_logger.info(f"Extracting data from Spotify for artist albums updated between: {self.album_start_date}")
+        etl_logger.info(
+            f"Extracting data from Spotify for artist albums updated between: {self.album_start_date}"
+        )
 
-        artists = context.storm_db.get_artists_for_album_collection(self.album_start_date)
+        artists = context.storm_db.get_artists_for_album_collection(
+            self.album_start_date
+        )
         for artist in artists:
             albums = context.storm_client.get_artist_albums(artist["_id"])
             context.storm_db.update_albums_from_artist_albums(artist, albums)
-            
-            etl_logger.info(f"Extracted {len(albums)} albums for artist: {artist['_id']}, {artist['name']}")
 
-        etl_logger.info(f"Data synchronized with database for artist albums updated prior to: {self.album_start_date}")
+            etl_logger.info(
+                f"Extracted {len(albums)} albums for artist: {artist['_id']}, {artist['name']}"
+            )
+
+        etl_logger.info(
+            f"Data synchronized with database for artist albums updated prior to: {self.album_start_date}"
+        )
+
 
 class ETLAlbumTracks(StormOperation):
     """
@@ -72,18 +84,25 @@ class ETLAlbumTracks(StormOperation):
         Execute the operation.
         """
 
-        etl_logger.info(f"Extracting data from Spotify for album tracks not updated since prior to: {self.album_last_collected_date}")
+        etl_logger.info(
+            f"Extracting data from Spotify for album tracks not updated since prior to: {self.album_last_collected_date}"
+        )
 
-        albums = context.storm_db.get_albums_for_track_collection(self.album_last_collected_date, only_return_missing=True)
+        albums = context.storm_db.get_albums_for_track_collection(
+            self.album_last_collected_date, only_return_missing=True
+        )
         for album in albums:
             tracks = context.storm_client.get_album_tracks(album["_id"])
 
             if len(tracks) > 0:
                 context.storm_db.update_tracks_from_album_tracks(album["_id"], tracks)
-                etl_logger.info(f"Extracted {len(tracks)} tracks for album: {album['_id']}, {album['name']}")
+                etl_logger.info(
+                    f"Extracted {len(tracks)} tracks for album: {album['_id']}, {album['name']}"
+                )
 
             else:
                 context.storm_db.update_album_track_collection_fail(album["_id"])
 
-
-        etl_logger.info(f"Data synchronized with database for album tracks updated prior to: {self.album_last_collected_date}")
+        etl_logger.info(
+            f"Data synchronized with database for album tracks updated prior to: {self.album_last_collected_date}"
+        )

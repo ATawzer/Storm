@@ -1,9 +1,11 @@
 from pymongo import MongoClient
-from storm.objects import StormConfig, Playlist, Track, PlaylistTrack, Artist, Album
+from storm.objects import StormConfig, Playlist, Track, PlaylistTrack, Artist, Album, ArtistBlacklist
 
 from .utils.logging import database_logger
 from mongoengine import connect
 from mongoengine.queryset.visitor import Q
+
+from datetime import datetime
 
 
 class StormDB:
@@ -52,11 +54,17 @@ class StormDB:
 
         database_logger.info(f"Updated playlist: {playlist['id']}")
 
-    def update_playlist_tracks(self, playlist_id, tracks):
+    def update_playlist_tracks(self, playlist_id, tracks, flag_deleted=False):
         """Updates the playlist tracks in the database."""
         for track in tracks:
             track.update({"playlist_id": playlist_id})
             PlaylistTrack.from_json(track).save()
+
+        if flag_deleted:
+            for track in PlaylistTrack.objects(playlist_id=playlist_id):
+                if track not in tracks:
+                    track.soft_delete()
+                    track.save()
 
         database_logger.info(f"Updated playlist tracks: {len(tracks)}")
 
@@ -66,7 +74,7 @@ class StormDB:
 
         if the artist already exists it will not update.
         """
-        
+
         Track.objects()
         for track in Track.objects():
             artists = track["artists"]
@@ -74,7 +82,9 @@ class StormDB:
                 artist_id = artist["id"] if "id" in artist else None
                 if artist_id:
                     if not Artist.objects(_id=artist_id).first():
-                        database_logger.info(f"New artist found in tracks: {artist_id}, {artist['name'] if 'name' in artist else 'No Artist Name'}")
+                        database_logger.info(
+                            f"New artist found in tracks: {artist_id}, {artist['name'] if 'name' in artist else 'No Artist Name'}"
+                        )
                         Artist.from_json(artist).save()
 
         database_logger.info("Updated artists from tracks.")
@@ -96,16 +106,18 @@ class StormDB:
         If an artist has no last_album_update, they will be returned if return_missing is True.
         """
         query = Q()
-        
+
         if start_date:
             query &= Q(last_album_update__lte=start_date)
-            
+
         if return_missing:
             query |= Q(last_album_update__exists=False)
-        
+
         return Artist.objects(query)
-    
-    def get_albums_for_track_collection(self, start_date=None, only_return_missing=True):
+
+    def get_albums_for_track_collection(
+        self, start_date=None, only_return_missing=True
+    ):
         """Returns all albums for the track collection.
 
         If an end date is provided, only albums with tracks collected between
@@ -114,23 +126,19 @@ class StormDB:
         If an album has no tracks_collected_date, they will be returned if return_missing is True.
         """
         query = Q()
-        
+
         if start_date:
             query &= Q(tracks_collected_date__lte=start_date)
-            
+
         if only_return_missing:
             query &= Q(tracks_collected_date__exists=False)
-        
+
         return Album.objects(query)
-    
-    def get_tracks_by_release_date(self, start_date, end_date):
-        """Returns all tracks released between the start and end date."""
-        return Track.objects(release_date__gte=start_date, release_date__lt=end_date)
-    
+
     def update_tracks_from_album_tracks(self, album_id, tracks):
         """Updates the album tracks in the database."""
         for track in tracks:
-            track.update({"album": {"id":album_id}})
+            track.update({"album": {"id": album_id}})
             Track.from_json(track).save()
 
         Album.objects(_id=album_id).first().update_tracks_collected_date()
@@ -142,8 +150,66 @@ class StormDB:
         album.increment_track_collection_fail_count()
         album.save()
 
-        database_logger.warning(f"Album fail count at: {album.track_collection_fail_count} for album: {album_id}")
+        database_logger.warning(
+            f"Album fail count at: {album.track_collection_fail_count} for album: {album_id}"
+        )
 
+    def blacklist_artists_from_playlist(self, playlist_id, storm_name):
+        """Blacklists artists from the playlist in the database."""
+        playlist = Playlist.objects(_id=playlist_id).first()
+        artists = playlist.get_artists()
+        
+        for artist in artists:
+            if not ArtistBlacklist.objects(_id=artist["_id"]).first():
+                ArtistBlacklist(_id=artist["_id"], storm_name=storm_name).save()
 
+    def get_blacklisted_artists(self, storm_name):
+        """Returns all blacklisted artists for the specified storm."""
+        return ArtistBlacklist.objects(storm_name=storm_name)
+    
+    def get_playlist_tracks(self, playlist_id, include_deleted=False):
+        """Returns all tracks for the specified playlist."""
+        if include_deleted:
+            return PlaylistTrack.objects(playlist_id=playlist_id)
+        return PlaylistTrack.objects(playlist_id=playlist_id)
+    
+    def get_playlist_artists(self, playlist_id):
+        """Returns all artists for the specified playlist."""
+        tracks = self.get_playlist_tracks(playlist_id)
+        artists = []
+        for track in tracks:
+            artists.extend(track.get_artists())
+        return list(set(artists))
+    
+    def get_artist_albums(self, artist_id):
+        """Returns all albums for the specified artist."""
+        albums = Album.objects.all()
+        return [album for album in albums if any(artist['id'] == artist_id for artist in album.artists)]
+
+    def get_artist_albums_by_date(self, artist_id, start_date, end_date):
+        """Returns all albums for the specified artist between the specified dates."""
         
+        query = Q()
+        if start_date:
+            query &= Q(last_updated__gte=start_date)
+        if end_date:
+            query &= Q(last_updated__lte=end_date)
         
+        albums = Album.objects(query)
+        return [album for album in albums if any(artist['id'] == artist_id for artist in album.artists)]
+
+    def get_artist_tracks(self, artist_id):
+        """Returns all tracks where artist_id is in the "artist" list on the track."""
+        tracks = Track.objects.all()
+        return [track for track in tracks if any(artist['id'] == artist_id for artist in track.artists)]
+
+    def get_artist_tracks_by_date(self, artist_id, start_date, end_date):
+        """Returns all tracks for the specified artist between the specified dates"""
+        albums = self.get_artist_albums_by_date(artist_id, start_date, end_date)
+        tracks = []
+        for album in albums:
+            album_tracks = Track.objects.filter(album__id=album['_id'])
+            tracks.extend(album_tracks)
+        
+        return tracks
+

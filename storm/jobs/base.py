@@ -22,10 +22,10 @@ class StormContext:
     Contains the necessary objects for a job to execute.
     """
 
-    def __init__(self, storm_client, storm_db):
+    def __init__(self, storm_client, storm_db, storm_user_client=None):
         self.storm_client = storm_client
         self.storm_db = storm_db
-
+        self.storm_user_client = storm_user_client
 
 class StormOperation:
     """

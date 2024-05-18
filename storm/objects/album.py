@@ -9,6 +9,7 @@ from mongoengine import (
 
 from datetime import datetime
 
+
 class Album(Document):
     """
     A class used to represent an album in the database.
@@ -51,19 +52,25 @@ class Album(Document):
             album_type=json["album_type"] if "album_type" in json else None,
             total_tracks=json["total_tracks"] if "total_tracks" in json else None,
             artists=json["artists"] if "artists" in json else [],
-            available_markets=json["available_markets"] if "available_markets" in json else [],
+            available_markets=(
+                json["available_markets"] if "available_markets" in json else []
+            ),
             external_urls=json["external_urls"] if "external_urls" in json else {},
             href=json["href"] if "href" in json else None,
             images=json["images"] if "images" in json else [],
             name=json["name"],
             release_date=json["release_date"] if "release_date" in json else None,
-            release_date_precision=json["release_date_precision"] if "release_date_precision" in json else None,
+            release_date_precision=(
+                json["release_date_precision"]
+                if "release_date_precision" in json
+                else None
+            ),
             restrictions=json["restrictions"] if "restrictions" in json else {},
             type=json["type"] if "type" in json else None,
             uri=json["uri"] if "uri" in json else None,
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
-    
+
     def update_tracks_collected_date(self):
         """Updates the tracks collected date."""
         self.tracks_collected_date = datetime.now()

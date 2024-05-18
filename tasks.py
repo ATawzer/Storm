@@ -1,9 +1,10 @@
 from invoke import task
-from storm.jobs import ETLPlaylistOperation, ETLArtistAlbums, ETLAlbumTracks
-from storm import StormClient, StormDB
+from storm.jobs import ETLPlaylistOperation, ETLArtistAlbums, ETLAlbumTracks, ArtistTrackBuilder
+from storm import StormClient, StormDB, StormUserClient
 from storm.jobs.base import StormContext
 
 from datetime import datetime, timedelta
+import os
 
 @task
 def test(c, format=True, lint=True):
@@ -49,4 +50,23 @@ def extract_missing_album_tracks(c):
     """ Extracts missing album tracks from Spotify"""
     context = StormContext(StormClient(), StormDB())
     ETLAlbumTracks().execute(context)
+
+@task
+def run_storm_in_range(c, start_date=None, end_date=None):
+    """ Runs the storm ETL job in a date range"""
+    if not start_date:
+        start_date = datetime.now() - timedelta(days=7)
+    else:
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+
+    if not end_date:
+        end_date = datetime.now()
+    else:    
+        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+    context = StormContext(StormClient(), StormDB(), StormUserClient(os.getenv("SPOTIFY_USER_ID")))
+    artists = context.storm_db.get_playlist_artists("0R1gw1JbcOFD0r8IzrbtYP")
+    tracks = ArtistTrackBuilder(artists, start_date, end_date).execute(context)
+
+    context.storm_user_client.add_tracks_to_new_playlist(tracks, f"Storm {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
     

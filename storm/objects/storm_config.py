@@ -1,4 +1,4 @@
-from mongoengine import Document, StringField, ObjectIdField
+from mongoengine import Document, StringField, ObjectIdField, ListField
 
 
 class StormConfig(Document):
@@ -17,9 +17,8 @@ class StormConfig(Document):
         written to.
     """
 
-    storm_name = StringField(required=True)
-    input_playlist = StringField(required=True)
-    target_playlist = StringField(required=True)
-    _id = ObjectIdField()
+    storm_name = StringField(required=True, primary_key=True)
+    input_playlists = ListField()
+    artist_blacklist_playlist = StringField()
 
     meta = {"collection": "storm_config"}
