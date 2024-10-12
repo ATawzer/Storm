@@ -43,7 +43,8 @@ class ETLArtistAlbums(StormOperation):
     Currently filters on the update date for the artists.
     """
 
-    def __init__(self, album_start_date):
+    def __init__(self, artists, album_start_date):
+        self.artists = artists
         self.album_start_date = album_start_date
 
     def execute(self, context):
@@ -55,9 +56,12 @@ class ETLArtistAlbums(StormOperation):
             f"Extracting data from Spotify for artist albums updated between: {self.album_start_date}"
         )
 
-        artists = context.storm_db.get_artists_for_album_collection(
+        # intersection of artists specified and artists in the database
+        artists_to_collect = context.storm_db.get_artists_for_album_collection(
             self.album_start_date
         )
+        artists = [artist for artist in artists_to_collect if artist["_id"] in self.artists]
+        
         for artist in artists:
             albums = context.storm_client.get_artist_albums(artist["_id"])
             context.storm_db.update_albums_from_artist_albums(artist, albums)

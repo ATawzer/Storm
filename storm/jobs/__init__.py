@@ -26,7 +26,6 @@ class ArtistTrackBuilder(StormOperation):
             artist_tracks = context.storm_db.get_artist_tracks_by_date(artist, self.start_date, self.end_date)
             tracks.extend(artist_tracks)
 
-            etl_logger.info(f"{len(tracks)} tracks found")
-
+        etl_logger.info(f"{len(tracks)} tracks found")
         return tracks
 

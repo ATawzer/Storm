@@ -89,6 +89,16 @@ class StormDB:
 
         database_logger.info("Updated artists from tracks.")
 
+    def update_artists_from_playlist_tracks(self, playlist_id):
+        """Updates the artists from the playlist tracks in the database."""
+        tracks = PlaylistTrack.objects(playlist_id=playlist_id)
+        for track in tracks:
+            for artist in track.get_artists(id_only=False):
+                if not Artist.objects(_id=artist["id"]).first():
+                    Artist.from_json(artist).save()
+
+        database_logger.info(f"Updated artists from playlist tracks: {len(tracks)}")
+
     def update_albums_from_artist_albums(self, artist, albums):
         """Updates the artist albums in the database."""
         for album in albums:
@@ -191,9 +201,9 @@ class StormDB:
         
         query = Q()
         if start_date:
-            query &= Q(last_updated__gte=start_date)
+            query &= Q(release_date__gte=start_date)
         if end_date:
-            query &= Q(last_updated__lte=end_date)
+            query &= Q(release_date__lte=end_date)
         
         albums = Album.objects(query)
         return [album for album in albums if any(artist['id'] == artist_id for artist in album.artists)]

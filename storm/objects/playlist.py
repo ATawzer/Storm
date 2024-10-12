@@ -110,9 +110,12 @@ class PlaylistTrack(Document):
         track = Track.from_json(self.track)
         track.save()
 
-    def get_artists(self):
+    def get_artists(self, id_only=True):
         """Returns a list of artists for the track."""
-        return [x["id"] for x in self.track["artists"]]
+        if id_only:
+            return [x["id"] for x in self.track["artists"]]
+        else:
+            return self.track["artists"]
     
     def soft_delete(self):
         """Soft deletes the playlist track."""

@@ -15,6 +15,7 @@ black = "*"
 pytest-cov = "*"
 mongomock = "*"
 python-dotenv = "*"
+pandas = "*"
 
 [dev-packages]
 

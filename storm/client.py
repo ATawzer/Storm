@@ -33,7 +33,7 @@ class StormClient:
     def get_artist_albums(self, artist_id):
         """Get all albums by an artist."""
         albums = []
-        results = self.sp.artist_albums(artist_id)
+        results = self.sp.artist_albums(artist_id, album_type="album,single")
         while results:
             albums.extend(results["items"])
             results = self.sp.next(results)
@@ -66,11 +66,37 @@ class StormUserClient:
 
         self.user_id = user_id
 
-    def add_tracks_to_playlist(self, playlist_id, track_ids):
-        """Write tracks to a playlist."""
-        self.sp.user_playlist_add_tracks(self.user_id, playlist_id, track_ids)
+    def add_tracks_to_playlist(self, playlist_id, track_ids, overwrite=False):
+        """Write tracks to a playlist in batches."""
+        batch_size = 100  # Spotify's limit for adding tracks in a single request
+        for i in range(0, len(track_ids), batch_size):
+            batch = track_ids[i:i + batch_size]
 
-        client_logger.info(f"Added {len(track_ids)} tracks to playlist: {playlist_id}")
+            if overwrite and i == 0:
+                self.sp.user_playlist_replace_tracks(self.user_id, playlist_id, batch)
+                client_logger.info(f"Replaced tracks in playlist: {playlist_id}")
+                continue
+
+            self.sp.user_playlist_add_tracks(self.user_id, playlist_id, batch)
+
+        client_logger.info(f"Added a total of {len(track_ids)} tracks to playlist: {playlist_id}")
+
+    def add_tracks_to_playlist_by_name(self, playlist_name, track_ids, make_new=False, overwrite=False):
+        """Add tracks to a playlist by name."""
+        playlist_id = self.get_playlist_id_by_name(playlist_name)
+        if not playlist_id and make_new:
+            playlist_id = self.create_playlist(playlist_name)
+        self.add_tracks_to_playlist(playlist_id, track_ids, overwrite=overwrite)
+
+    def get_playlist_id_by_name(self, playlist_name):
+        """Get the ID of a playlist by name."""
+        playlists = self.sp.current_user_playlists()
+        for playlist in playlists["items"]:
+            if playlist["name"] == playlist_name:
+                return playlist["id"]
+
+        client_logger.error(f"Playlist not found: {playlist_name}")
+        return None
 
     def create_playlist(self, playlist_name):
         """Create a new playlist."""
